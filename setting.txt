@@ -1,0 +1,77 @@
+wget -q -O- 'https://download.ceph.com/keys/release.asc' | sudo apt-key add -
+
+echo deb http://download.ceph.com/debian-jewel/ trusty main | sudo tee /etc/apt/sources.list.d/ceph.list
+
+sudo apt-get update && sudo apt-get install ceph-deploy
+
+sudo useradd -m -s /bin/bash ceph-deploy
+sudo passwd ceph-deploy
+
+echo "ceph-deploy ALL = (root) NOPASSWD:ALL" | sudo tee /etc/sudoers.d/ceph-deploy
+
+sudo chmod 0440 /etc/sudoers.d/ceph-deploy
+
+
+# ceph-deploy 사용자로 작업 - START
+sudo su - ceph-deploy
+
+ssh-keygen
+
+ssh-copy-id ceph-deploy@ceph-single-node
+
+cd ~
+mkdir my-cluster
+cd my-cluster
+
+ceph-deploy new ceph-single-node
+
+vi ceph.conf
+[osd]
+osd pool default size = 2
+osd crush chooseleaf type = 0
+
+ceph-deploy install ceph-single-node
+
+ceph-deploy mon create-initial
+
+ceph-deploy osd prepare ceph-single-node:sdb
+ceph-deploy osd prepare ceph-single-node:sdc
+ceph-deploy osd prepare ceph-single-node:sdd
+
+ceph-deploy osd activate ceph-single-node:/dev/sdb1
+ceph-deploy osd activate ceph-single-node:/dev/sdc1
+ceph-deploy osd activate ceph-single-node:/dev/sdd1
+
+ceph-deploy admin ceph-single-node
+sudo chmod +r /etc/ceph/ceph.client.admin.keyring
+
+ceph osd pool set rbd pg_num 256
+ceph osd pool set rbd pgp_num 256
+
+sudo stop ceph-mon-all
+sudo start ceph-mon-all
+
+ceph -s
+
+ceph osd pool create cephfs_data 128
+ceph osd pool create cephfs_metadata 128
+
+ceph fs new cephfs cephfs_metadata cephfs_data
+
+sudo apt-get install ceph-fs-common
+
+sudo mkdir /mnt/mycephfs
+
+ceph-deploy@ceph-single-node:~/my-cluster$ cat ~/my-cluster/ceph.client.admin.keyring
+[client.admin]
+        key = AQDjxEVaTgEQMBAAeFN7EIy4b1Xw5IgTGSheCA==
+        caps mds = "allow *"
+        caps mon = "allow *"
+        caps osd = "allow *"
+ceph-deploy@ceph-single-node:~/my-cluster$
+
+
+sudo mount -t ceph ceph-single-node:6789:/ /mnt/mycephfs -o name=admin,secret=AQDjxEVaTgEQMBAAeFN7EIy4b1Xw5IgTGSheCA==
+
+
+# ceph-deploy 사용자로 작업 - END
