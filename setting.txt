@@ -54,8 +54,19 @@ ceph -s
 ceph-deploy rgw create ceph-single-node
 ceph-deploy mds create ceph-single-node
 
+### Ceph FS
+
 ceph osd pool create cephfs_data 128
 ceph osd pool create cephfs_metadata 128
+
+ceph osd pool set cephfs_metadata size 1
+ceph osd pool set cephfs_data size 1
+ceph osd pool set .rgw.root size 1
+ceph osd pool set default.rgw.control size 1
+ceph osd pool set default.rgw.data.root size 1
+ceph osd pool set default.rgw.gc size 1
+ceph osd pool set default.rgw.log size 1
+
 
 ceph fs new cephfs cephfs_metadata cephfs_data
 
@@ -75,4 +86,26 @@ ceph-deploy@ceph-single-node:~/my-cluster$
 sudo mount -t ceph ceph-single-node:6789:/ /mnt/mycephfs -o name=admin,secret=AQCS3EpaDZ/aDRAAWKy0xnkczl49XEV4b64ZuQ==
 
 
+### Object Storage (Amazon s3 Compatible)
+
+sudo radosgw-admin user create --uid="s3user" --display-name="S3 User"
+
+sudo apt-get install s3cmd
+
+s3cmd --configure
+
+vim .s3config
+
+host_base = 192.168.56.71:7480
+host_bucket = %(bucket)s.192.168.56.71:7480
+
 # ceph-deploy 사용자로 작업 - END
+
+
+s3cmd mb s3://TESTING
+
+echo "Hello World" > hello.txt
+s3cmd put hello.txt s3://TESTING
+s3cmd ls s3://TESTING
+
+2016-05-01 03:39        12   s3://TESTING/hello.txt

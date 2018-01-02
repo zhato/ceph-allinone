@@ -1,0 +1,106 @@
+rpm -Uhv http://download.ceph.com/rpm-jewel/el7/noarch/ceph-release-1-1.el7.noarch.rpm
+
+yum update -y && sudo yum install ceph-deploy -y
+
+sudo useradd -m -s /bin/bash cephuser
+sudo passwd cephuser
+
+echo "cephuser ALL = (root) NOPASSWD:ALL" | sudo tee /etc/sudoers.d/cephuser
+
+sudo chmod 0440 /etc/sudoers.d/cephuser
+
+
+# cephuser 사용자로 작업 - START
+sudo su - cephuser
+
+ssh-keygen
+
+ssh-copy-id cephuser@ceph.zhato.com
+
+cd ~
+mkdir cluster
+cd cluster
+
+ceph-deploy new ceph.zhato.com
+
+vi ceph.conf
+[osd]
+osd pool default size = 1
+osd crush chooseleaf type = 0
+
+ceph-deploy install ceph.zhato.com
+
+ceph-deploy mon create-initial
+
+ceph-deploy osd prepare ceph.zhato.com:sdb
+ceph-deploy osd prepare ceph.zhato.com:sdc
+ceph-deploy osd prepare ceph.zhato.com:sdd
+
+ceph-deploy osd activate ceph.zhato.com:/dev/sdb1
+ceph-deploy osd activate ceph.zhato.com:/dev/sdc1
+ceph-deploy osd activate ceph.zhato.com:/dev/sdd1
+
+ceph-deploy admin ceph.zhato.com
+sudo chmod +r /etc/ceph/ceph.client.admin.keyring
+
+ceph osd pool set rbd pg_num 128
+ceph osd pool set rbd pgp_num 128
+
+ceph-deploy rgw create ceph.zhato.com
+ceph-deploy mds create ceph.zhato.com
+
+### Ceph FS
+
+ceph osd pool create cephfs_data 128
+ceph osd pool create cephfs_metadata 128
+
+ceph osd pool set rbd size 1
+ceph osd pool set cephfs_metadata size 1
+ceph osd pool set cephfs_data size 1
+ceph osd pool set .rgw.root size 1
+ceph osd pool set default.rgw.control size 1
+ceph osd pool set default.rgw.data.root size 1
+ceph osd pool set default.rgw.gc size 1
+ceph osd pool set default.rgw.log size 1
+ceph osd pool set default.rgw.users.uid size 1
+ceph osd pool set default.rgw.users.keys size 1
+ceph osd pool set default.rgw.buckets.index size 1
+
+ceph -s
+
+ceph fs new cephfs cephfs_metadata cephfs_data
+
+sudo yum -y install ceph-fuse
+
+ssh cephuser@ceph.zhato.com 'sudo ceph-authtool -p /etc/ceph/ceph.client.admin.keyring' > ceph.key
+chmod 600 ceph.key
+
+sudo mkdir -p /mnt/cephfs
+sudo mount -t ceph ceph.zhato.com:6789:/ /mnt/cephfs -o name=admin,secretfile=ceph.key
+
+### Object Storage (Amazon s3 Compatible)
+
+sudo yum install -y s3cmd
+
+sudo radosgw-admin user create --uid="s3user" --display-name="S3 User"
+
+"access_key": "XW5TPWSRHTGYD15UN15N",
+"secret_key": "XbJRRV96srzLSwMfOg6jGAAZGi4kBffPvrMHSwfa"
+
+s3cmd --configure
+
+vim .s3config
+
+host_base = 192.168.56.71:7480
+host_bucket = %(bucket)s.192.168.56.71:7480
+
+# cephuser 사용자로 작업 - END
+
+
+s3cmd mb s3://TESTING
+
+echo "Hello World" > hello.txt
+s3cmd put hello.txt s3://TESTING
+s3cmd ls s3://TESTING
+
+2016-05-01 03:39        12   s3://TESTING/hello.txt
