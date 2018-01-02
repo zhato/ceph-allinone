@@ -45,13 +45,14 @@ ceph-deploy osd activate ceph-single-node:/dev/sdd1
 ceph-deploy admin ceph-single-node
 sudo chmod +r /etc/ceph/ceph.client.admin.keyring
 
-ceph osd pool set rbd pg_num 256
-ceph osd pool set rbd pgp_num 256
-
-sudo stop ceph-mon-all
-sudo start ceph-mon-all
+ceph osd pool set rbd pg_num 128
+ceph osd pool set rbd pgp_num 128
+ceph osd pool set rbd size 1
 
 ceph -s
+
+ceph-deploy rgw create ceph-single-node
+ceph-deploy mds create ceph-single-node
 
 ceph osd pool create cephfs_data 128
 ceph osd pool create cephfs_metadata 128
@@ -71,7 +72,7 @@ ceph-deploy@ceph-single-node:~/my-cluster$ cat ~/my-cluster/ceph.client.admin.ke
 ceph-deploy@ceph-single-node:~/my-cluster$
 
 
-sudo mount -t ceph ceph-single-node:6789:/ /mnt/mycephfs -o name=admin,secret=AQDjxEVaTgEQMBAAeFN7EIy4b1Xw5IgTGSheCA==
+sudo mount -t ceph ceph-single-node:6789:/ /mnt/mycephfs -o name=admin,secret=AQCS3EpaDZ/aDRAAWKy0xnkczl49XEV4b64ZuQ==
 
 
 # ceph-deploy 사용자로 작업 - END
